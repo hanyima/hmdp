@@ -1,17 +1,16 @@
-package com.hmdp.utils;
+package com.hmdp.inteceptors;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.map.MapUtil;
 import com.hmdp.dto.UserDTO;
-import com.hmdp.entity.User;
-import com.hmdp.service.impl.UserServiceImpl;
+import com.hmdp.utils.RedisConstants;
+import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -40,24 +39,12 @@ public class LoginInterceptor implements HandlerInterceptor {
         String token = request.getHeader("authorization");
 
         Map<Object, Object> userDTOMap = stringRedisTemplate.opsForHash().entries(REDIS_TOKEN_PREFIX + token);
-        UserDTO userDTO = new UserDTO();
-        if(userDTOMap==null){
+        if(MapUtil.isEmpty(userDTOMap)){
             log.info("用户未登录");
             response.setStatus(401);
             return false;
         }
-        BeanUtil.fillBeanWithMap(userDTOMap, userDTO, true);
-
-        UserHolder.saveUser(userDTO);
-
-        //刷新登录有效期
-        stringRedisTemplate.expire(REDIS_TOKEN_PREFIX + token,RedisConstants.LOGIN_USER_TTL, TimeUnit.SECONDS);
         return true;
     }
 
-    @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        //防止内存泄漏
-        UserHolder.removeUser();
-    }
 }
