@@ -16,13 +16,7 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class LoginInterceptor implements HandlerInterceptor {
-    StringRedisTemplate stringRedisTemplate;
 
-    private static final String REDIS_TOKEN_PREFIX = "login:token:";
-
-    public LoginInterceptor(StringRedisTemplate stringRedisTemplate) {
-        this.stringRedisTemplate = stringRedisTemplate;
-    }
 
     /**
      * 登录校验
@@ -36,14 +30,15 @@ public class LoginInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         //HttpSession session = request.getSession();
         //User user = (User)session.getAttribute("user");
-        String token = request.getHeader("authorization");
 
-        Map<Object, Object> userDTOMap = stringRedisTemplate.opsForHash().entries(REDIS_TOKEN_PREFIX + token);
-        if(MapUtil.isEmpty(userDTOMap)){
+        UserDTO userDTO = UserHolder.getUser();
+
+        if(userDTO == null){
             log.info("用户未登录");
             response.setStatus(401);
             return false;
         }
+
         return true;
     }
 

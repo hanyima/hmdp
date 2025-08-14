@@ -33,7 +33,11 @@ public class ShopController {
      */
     @GetMapping("/{id}")
     public Result queryShopById(@PathVariable("id") Long id) {
-        return Result.ok(shopService.getById(id));
+        //return Result.ok(shopService.getById(id));
+
+        //查询店铺信息，增加缓存版
+        return Result.ok(shopService.queryById(id)) ;
+
     }
 
     /**

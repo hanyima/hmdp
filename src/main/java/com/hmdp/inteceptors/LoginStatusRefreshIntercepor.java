@@ -25,7 +25,7 @@ public class LoginStatusRefreshIntercepor implements HandlerInterceptor {
 
         String token = request.getHeader("authorization");
 
-        String key = RedisConstants.LOGIN_CODE_KEY + token ;
+        String key = RedisConstants.LOGIN_USER_KEY + token ;
         Map<Object, Object> userDTOMap = stringRedisTemplate.opsForHash().entries(key);
 
         if(MapUtil.isEmpty(userDTOMap))

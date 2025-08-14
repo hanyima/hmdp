@@ -1,10 +1,18 @@
 package com.hmdp.service.impl;
 
+import cn.hutool.json.JSONString;
+import cn.hutool.json.JSONUtil;
 import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.utils.RedisConstants;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>
@@ -16,5 +24,29 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
+    @Resource
+    StringRedisTemplate stringRedisTemplate;
 
+    @Override
+    public Shop queryById(Long id) {
+        //1.查询缓存
+        String key = RedisConstants.CACHE_SHOP_KEY + id  ;
+        String shopJson = stringRedisTemplate.opsForValue().get(key);
+        if(!StringUtils.isEmpty(shopJson)){
+            Shop shop = JSONUtil.toBean(shopJson, Shop.class, true);
+            return shop;
+        }
+
+        //2.缓存未命中则查询数据库
+        Shop shop = getById(id);
+        if(shop != null){
+            stringRedisTemplate.opsForValue().set(key,JSONUtil.toJsonStr(shop),RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES);
+            return shop;
+        }
+
+        //3.数据库未命中，缓存空值
+        stringRedisTemplate.opsForValue().set(key,null,RedisConstants.CACHE_NULL_TTL,TimeUnit.MINUTES);
+
+        return null;
+    }
 }

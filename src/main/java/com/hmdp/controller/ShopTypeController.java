@@ -29,6 +29,6 @@ public class ShopTypeController {
     public Result queryTypeList() {
         List<ShopType> shopTypes = typeService.queryTypeList();
 
-        return Result.ok(shopTypes)
+        return Result.ok(shopTypes);
     }
 }

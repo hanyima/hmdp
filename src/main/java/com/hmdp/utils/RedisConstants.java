@@ -21,4 +21,6 @@ public class RedisConstants {
     public static final String USER_SIGN_KEY = "sign:";
 
     public static final String CACHE_SHOP_TYPE_KEY = "cache:shop_type";
+    public static final Long CACHE_SHOP_TYPE_TTL = 30L;
+
 }

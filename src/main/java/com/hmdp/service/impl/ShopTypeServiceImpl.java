@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -37,6 +38,7 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> i
         if(!CollectionUtil.isEmpty(shopTypeJsonList)){
            shopTypeList = shopTypeJsonList.stream().map(j-> (ShopType)JSONUtil.toBean(j,ShopType.class,true)
            ).collect(Collectors.toList());
+           stringRedisTemplate.expire(key,RedisConstants.CACHE_SHOP_TYPE_TTL, TimeUnit.MINUTES);
            return shopTypeList;
         }
 
@@ -50,6 +52,7 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> i
                 shopTypeList.stream()
                         .map(s-> JSONUtil.toJsonStr(s))
                         .collect(Collectors.toList()));
+        stringRedisTemplate.expire(key,RedisConstants.CACHE_SHOP_TYPE_TTL, TimeUnit.MINUTES);
 
         return shopTypeList;
     }

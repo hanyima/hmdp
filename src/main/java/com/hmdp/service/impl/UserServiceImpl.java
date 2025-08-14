@@ -41,7 +41,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     //验证码过期时间
     private static final long TIMEOUT_SECONDS = 90L;
     //用户登录持续时间
-    private static final long USER_TIME_TO_LIVE = 60L;
+    private static final long USER_TIME_TO_LIVE = 3600L;
 
     @Override
     public Result sendCode(String phone, HttpSession session) {
