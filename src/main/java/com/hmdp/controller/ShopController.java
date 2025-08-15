@@ -36,7 +36,7 @@ public class ShopController {
         //return Result.ok(shopService.getById(id));
 
         //查询店铺信息，增加缓存版
-        return Result.ok(shopService.queryById(id)) ;
+        return shopService.queryById(id) ;
 
     }
 

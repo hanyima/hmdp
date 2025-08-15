@@ -30,26 +30,30 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     StringRedisTemplate stringRedisTemplate;
 
     @Override
-    public Shop queryById(Long id) {
+    public Result queryById(Long id) {
         //1.查询缓存
         String key = RedisConstants.CACHE_SHOP_KEY + id  ;
         String shopJson = stringRedisTemplate.opsForValue().get(key);
         if(!StringUtils.isEmpty(shopJson)){
             Shop shop = JSONUtil.toBean(shopJson, Shop.class, true);
-            return shop;
+            return Result.ok(shop);
+        }
+
+        if(shopJson!=null){
+            return Result.fail("查询的店铺不存在");
         }
 
         //2.缓存未命中则查询数据库
         Shop shop = getById(id);
         if(shop != null){
             stringRedisTemplate.opsForValue().set(key,JSONUtil.toJsonStr(shop),RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES);
-            return shop;
+            return Result.ok(shop);
         }
 
         //3.数据库未命中，缓存空值
-        stringRedisTemplate.opsForValue().set(key,null,RedisConstants.CACHE_NULL_TTL,TimeUnit.MINUTES);
+        stringRedisTemplate.opsForValue().set(key,"",RedisConstants.CACHE_NULL_TTL,TimeUnit.MINUTES);
 
-        return null;
+        return Result.fail("查询的店铺不存在");
     }
 
     /**
