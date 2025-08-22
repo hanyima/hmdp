@@ -1,11 +1,24 @@
 package com.hmdp.service.impl;
 
+import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.collection.ListUtil;
 import com.hmdp.dto.Result;
+import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.VoucherOrderMapper;
+import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.utils.RedisWorker;
+import com.hmdp.utils.UserHolder;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
+import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * <p>
@@ -15,18 +28,81 @@ import org.springframework.stereotype.Service;
  * @author 虎哥
  * @since 2021-12-22
  */
+
+@Slf4j
 @Service
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
+    @Resource
+    ISeckillVoucherService iSeckillVoucherService;
+    @Resource
+    RedisWorker redisWorker;
 
     @Override
     public Result seckillVoucher(Long voucherId) {
         //1.查询优惠卷信息
+        SeckillVoucher seckillVoucher = iSeckillVoucherService.query().eq("voucher_id", voucherId).list().get(0);
 
         //2.判断是否在活动期间
+        LocalDateTime beginTime = seckillVoucher.getBeginTime();
+        LocalDateTime endTime = seckillVoucher.getEndTime();
+        LocalDateTime now = LocalDateTime.now();
+        if(now.isAfter(endTime)||now.isBefore(beginTime)){
+            log.info("秒杀券不在活动时间");
+            return Result.fail("秒杀券不在活动时间");
+        }
 
         //3.判断库存是否充足
+        if (seckillVoucher.getStock()<=0){
+            log.info("优惠券{}库存不足",seckillVoucher);
+            return Result.fail("优惠券库存不足");
+        }
+        VoucherOrder voucherOrder = null;
+        Long userId = UserHolder.getUser().getId();
 
-        //4.扣减库存
+        IVoucherOrderService proxy = (IVoucherOrderService)AopContext.currentProxy();
+
+        synchronized (userId.toString().intern()){
+            voucherOrder = proxy.createSeckillOrder(voucherId,userId);
+        }
+        if(voucherOrder==null){
+            return Result.fail("订单创建失败");
+        }
+        log.info("订单创建成功{}",seckillVoucher);
+        return Result.ok();
+
 
     }
+
+    @Transactional
+    public VoucherOrder createSeckillOrder(Long voucherId,Long userId){
+
+        //4.判断该用户是否购买过
+        List list = query().eq("voucher_id", voucherId)
+                .eq("user_id", userId)
+                .list();
+        if (!CollectionUtil.isEmpty(list)){
+            log.info("无法重复购买");
+            return null;
+        }
+        //5.扣减库存（如果足够）
+        boolean flag = iSeckillVoucherService.update()
+                .setSql("stock = stock-1")
+                .eq("voucher_id", voucherId)
+                .gt("stock", 0)
+                .update();
+        if(!flag){
+            log.info("库存不足");
+            return null;
+        }
+
+        //6.创建订单
+
+        VoucherOrder voucherOrder =new VoucherOrder();
+        voucherOrder.setVoucherId(voucherId);
+        voucherOrder.setId(redisWorker.nextId("seckill_order"));
+        voucherOrder.setUserId(userId);
+        save(voucherOrder);
+        return voucherOrder ;
+    }
+
 }
