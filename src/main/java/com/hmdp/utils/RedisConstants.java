@@ -23,4 +23,6 @@ public class RedisConstants {
     public static final String CACHE_SHOP_TYPE_KEY = "cache:shop_type";
     public static final Long CACHE_SHOP_TYPE_TTL = 30L;
 
+    public static final String CACHE_SECKILL_VOUCHER_KEY = "cache:seckill_voucher:";
+    public static final String CACHE_SECKILL_ORDER_KEY = "cache:seckill_order";
 }

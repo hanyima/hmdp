@@ -9,10 +9,15 @@ import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RedisWorker;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.core.io.PathResource;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,44 +38,34 @@ import java.util.List;
 @Service
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
     @Resource
-    ISeckillVoucherService iSeckillVoucherService;
+    private ISeckillVoucherService iSeckillVoucherService;
     @Resource
-    RedisWorker redisWorker;
+    private RedisWorker redisWorker;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+    private static DefaultRedisScript<Long> redisScript;
+    static {
+        redisScript = new DefaultRedisScript();
+        redisScript.setLocation(new PathResource("seckill.lua"));
+    }
 
     @Override
     public Result seckillVoucher(Long voucherId) {
-        //1.查询优惠卷信息
-        SeckillVoucher seckillVoucher = iSeckillVoucherService.query().eq("voucher_id", voucherId).list().get(0);
+        String key1 = RedisConstants.CACHE_SECKILL_VOUCHER_KEY + voucherId;
+        String key2 = RedisConstants.CACHE_SECKILL_ORDER_KEY + voucherId;
+        // 1.执行lua脚本，进行秒杀资格判断
+        Long res = stringRedisTemplate.execute(redisScript, List.of(key1, key2), UserHolder.getUser().getId());
 
-        //2.判断是否在活动期间
-        LocalDateTime beginTime = seckillVoucher.getBeginTime();
-        LocalDateTime endTime = seckillVoucher.getEndTime();
-        LocalDateTime now = LocalDateTime.now();
-        if(now.isAfter(endTime)||now.isBefore(beginTime)){
-            log.info("秒杀券不在活动时间");
-            return Result.fail("秒杀券不在活动时间");
+        //2.判断是否下单成功
+        if(res.intValue()!=0){
+            return Result.fail("下单失败");
         }
+        //3.下单成功 创建订单(阻塞队列)
 
-        //3.判断库存是否充足
-        if (seckillVoucher.getStock()<=0){
-            log.info("优惠券{}库存不足",seckillVoucher);
-            return Result.fail("优惠券库存不足");
-        }
-        VoucherOrder voucherOrder = null;
-        Long userId = UserHolder.getUser().getId();
 
-        IVoucherOrderService proxy = (IVoucherOrderService)AopContext.currentProxy();
 
-        synchronized (userId.toString().intern()){
-            voucherOrder = proxy.createSeckillOrder(voucherId,userId);
-        }
-        if(voucherOrder==null){
-            return Result.fail("订单创建失败");
-        }
-        log.info("订单创建成功{}",seckillVoucher);
         return Result.ok();
-
-
     }
 
     @Transactional
@@ -105,4 +100,38 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         return voucherOrder ;
     }
 
+//   ##旧版本实现
+//    public Result seckillVoucher(Long voucherId) {
+//        //1.查询优惠卷信息
+//        SeckillVoucher seckillVoucher = iSeckillVoucherService.query().eq("voucher_id", voucherId).list().get(0);
+//
+//        //2.判断是否在活动期间
+//        LocalDateTime beginTime = seckillVoucher.getBeginTime();
+//        LocalDateTime endTime = seckillVoucher.getEndTime();
+//        LocalDateTime now = LocalDateTime.now();
+//        if(now.isAfter(endTime)||now.isBefore(beginTime)){
+//            log.info("秒杀券不在活动时间");
+//            return Result.fail("秒杀券不在活动时间");
+//        }
+//
+//        //3.判断库存是否充足
+//        if (seckillVoucher.getStock()<=0){
+//            log.info("优惠券{}库存不足",seckillVoucher);
+//            return Result.fail("优惠券库存不足");
+//        }
+//        VoucherOrder voucherOrder = null;
+//        Long userId = UserHolder.getUser().getId();
+//
+//        IVoucherOrderService proxy = (IVoucherOrderService)AopContext.currentProxy();
+//
+//        synchronized (userId.toString().intern()){
+//            voucherOrder = proxy.createSeckillOrder(voucherId,userId);
+//        }
+//        if(voucherOrder==null){
+//            return Result.fail("订单创建失败");
+//        }
+//        log.info("订单创建成功{}",seckillVoucher);
+//        return Result.ok();
+//
+//    }
 }
