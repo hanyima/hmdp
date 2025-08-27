@@ -5,7 +5,7 @@ if stock<=0 then
     return 1
 end
 --2.判断一人一单
-if(redis.call('sismember',KEYS[2],ARGV[1])~=nil) then
+if(redis.call('sismember',KEYS[2],ARGV[1])== 1) then
     return 2
 end
 
